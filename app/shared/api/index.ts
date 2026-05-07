@@ -198,18 +198,50 @@ const realMetricsApi = {
     apiClient.get<ServerMetrics>('/metrics/day').then((r) => mapMetrics(r.data)),
 }
 
+interface ServerEntranceWithAssignments {
+  id: string
+  number: number
+  address: string
+  floorsTotal: number
+  assignments?: Array<{ cleanerId: string; cleaner: { id: string; name: string } }>
+}
+
 const realEntrancesApi = {
   getAll: (): Promise<Entrance[]> =>
-    apiClient
-      .get<Array<{ id: string; number: number; address: string; floorsTotal: number }>>('/entrances')
-      .then((r) =>
-        r.data.map((e) => ({
-          id: e.id,
-          number: e.number,
-          address: e.address,
-          floorsTotal: e.floorsTotal,
-        })),
-      ),
+    apiClient.get<ServerEntranceWithAssignments[]>('/entrances').then((r) =>
+      r.data.map((e) => ({
+        id: e.id,
+        number: e.number,
+        address: e.address,
+        floorsTotal: e.floorsTotal,
+        assignedCleanerIds: e.assignments?.map((a) => a.cleanerId) ?? [],
+      })),
+    ),
+  create: (dto: { number: number; address: string; floorsTotal: number }): Promise<Entrance> =>
+    apiClient.post<ServerEntranceWithAssignments>('/entrances', dto).then((r) => ({
+      id: r.data.id,
+      number: r.data.number,
+      address: r.data.address,
+      floorsTotal: r.data.floorsTotal,
+      assignedCleanerIds: [],
+    })),
+  update: (
+    id: string,
+    dto: { number?: number; address?: string; floorsTotal?: number },
+  ): Promise<Entrance> =>
+    apiClient.patch<ServerEntranceWithAssignments>(`/entrances/${id}`, dto).then((r) => ({
+      id: r.data.id,
+      number: r.data.number,
+      address: r.data.address,
+      floorsTotal: r.data.floorsTotal,
+      assignedCleanerIds: [],
+    })),
+  remove: (id: string): Promise<void> =>
+    apiClient.delete(`/entrances/${id}`).then(() => undefined),
+  assign: (id: string, cleanerId: string) =>
+    apiClient.post(`/entrances/${id}/assignments`, { cleanerId }).then((r) => r.data),
+  unassign: (id: string, cleanerId: string) =>
+    apiClient.delete(`/entrances/${id}/assignments/${cleanerId}`).then((r) => r.data),
 }
 
 const realQrApi = {

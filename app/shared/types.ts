@@ -54,6 +54,7 @@ export interface Entrance {
   number: number
   address: string
   floorsTotal: number
+  assignedCleanerIds?: string[]
 }
 
 export type QrLayout = 'one-per-page' | 'grid-2x3'

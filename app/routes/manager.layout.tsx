@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { id: 'overview', path: '/manager/overview', label: 'Обзор', icon: Icons.navOverview },
   { id: 'reviews', path: '/manager/reviews', label: 'Отзывы', icon: Icons.navReviews },
   { id: 'cleaners', path: '/manager/cleaners', label: 'Уборщицы', icon: Icons.navCleaners },
+  { id: 'entrances', path: '/manager/entrances', label: 'Дома', icon: Icons.navBuilding },
   { id: 'qr', path: '/manager/qr', label: 'QR-коды', icon: Icons.navQr },
 ]
 
