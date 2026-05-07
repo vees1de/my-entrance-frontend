@@ -19,10 +19,11 @@ export default observer(function CleanerLogin() {
   const [password, setPassword] = useState('')
 
   useEffect(() => {
+    if (!auth.hasHydrated) return
     if (auth.isAuthenticated && auth.role === 'cleaner') {
       navigate('/cleaner/dashboard', { replace: true })
     }
-  }, [auth.isAuthenticated, auth.role])
+  }, [auth.hasHydrated, auth.isAuthenticated, auth.role])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -20,12 +20,13 @@ export default observer(function ManagerLayout() {
   const location = useLocation()
 
   useEffect(() => {
+    if (!auth.hasHydrated) return
     if (!auth.isAuthenticated || auth.role !== 'manager') {
       navigate('/manager/login', { replace: true })
     }
-  }, [auth.isAuthenticated, auth.role])
+  }, [auth.hasHydrated, auth.isAuthenticated, auth.role])
 
-  if (!auth.isAuthenticated) return null
+  if (!auth.hasHydrated || !auth.isAuthenticated) return null
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: FONT, display: 'flex' }}>

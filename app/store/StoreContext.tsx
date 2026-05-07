@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { RootStore } from './RootStore'
 
 let store: RootStore | null = null
@@ -11,8 +11,14 @@ function getStore() {
 const StoreContext = createContext<RootStore | null>(null)
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const rootStore = getStore()
+
+  useEffect(() => {
+    rootStore.auth.hydrate()
+  }, [rootStore])
+
   return (
-    <StoreContext.Provider value={getStore()}>
+    <StoreContext.Provider value={rootStore}>
       {children}
     </StoreContext.Provider>
   )

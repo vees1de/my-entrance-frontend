@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../store/StoreContext'
 import { T, FONT } from '../shared/tokens'
@@ -8,7 +8,7 @@ import { Spinner } from '../shared/ui/Spinner'
 import { EmptyState } from '../shared/ui/EmptyState'
 import { ErrorState } from '../shared/ui/ErrorState'
 import { Icons } from '../shared/ui/icons'
-import type { Rating } from '../shared/types'
+import type { Rating, Review } from '../shared/types'
 
 export function meta() {
   return [{ title: 'Отзывы — Мой подъезд' }]
@@ -84,8 +84,57 @@ function FilterSelect({ label, value }: { label: string; value: string }) {
 const RATING_LABELS: Record<Rating, string> = { bad: 'Плохо', ok: 'Норм', good: 'Хорошо' }
 const RATING_TONE: Record<Rating, 'bad' | 'ok' | 'good'> = { bad: 'bad', ok: 'ok', good: 'good' }
 
+function ReviewPhotoModal({ review, onClose }: { review: Review; onClose: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15,23,42,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ width: 'min(920px, 100%)', maxHeight: '92vh', background: T.surface, borderRadius: 10, overflow: 'hidden', boxShadow: '0 24px 70px rgba(15,23,42,0.28)', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ height: 52, padding: '0 16px', borderBottom: `1px solid ${T.divider}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: FONT }}>Фото к отзыву</div>
+            <div style={{ fontSize: 12, color: T.textDim, marginTop: 1, fontFamily: FONT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {review.address ? `${review.address} · ` : ''}подъезд {review.entrance} · эт. {review.floor}
+            </div>
+          </div>
+          <a
+            href={review.photoUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ height: 30, padding: '0 10px', borderRadius: 8, border: `1px solid ${T.border}`, color: T.textMute, background: T.surface, display: 'inline-flex', alignItems: 'center', textDecoration: 'none', fontSize: 12, fontWeight: 600, fontFamily: FONT }}
+          >
+            Новая вкладка
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.textMute, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {Icons.close}
+          </button>
+        </div>
+        <div style={{ minHeight: 0, overflow: 'auto', background: T.bg2, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img
+            src={review.photoUrl}
+            alt="Фото к отзыву"
+            style={{ maxWidth: '100%', maxHeight: 'calc(92vh - 84px)', objectFit: 'contain', borderRadius: 8, background: T.surface }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default observer(function ManagerReviews() {
   const { reviews: store } = useStore()
+  const [selectedPhotoReview, setSelectedPhotoReview] = useState<Review | null>(null)
 
   useEffect(() => {
     store.loadReviews()
@@ -187,11 +236,19 @@ export default observer(function ManagerReviews() {
                     <div style={{ color: r.comment ? T.text : T.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {r.comment || '—'}
                       {r.photoUrl && (
-                        <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: T.bg2, color: T.textMute, fontWeight: 600, border: `1px solid ${T.border}` }}>фото</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPhotoReview(r)}
+                          style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: T.bg2, color: T.textMute, fontWeight: 600, border: `1px solid ${T.border}`, cursor: 'pointer', fontFamily: FONT }}
+                        >
+                          фото
+                        </button>
                       )}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      {r.rating === 'bad'
+                      {r.photoUrl
+                        ? <Button size="sm" kind="ghost" onClick={() => setSelectedPhotoReview(r)} style={{ height: 26, padding: '0 10px', fontSize: 12 }}>Фото</Button>
+                        : r.rating === 'bad'
                         ? <Button size="sm" style={{ height: 26, padding: '0 10px', fontSize: 12 }}>Ответить</Button>
                         : <Button size="sm" kind="ghost" style={{ height: 26, padding: '0 10px', fontSize: 12 }}>Открыть</Button>
                       }
@@ -203,6 +260,9 @@ export default observer(function ManagerReviews() {
           </div>
         </div>
       </div>
+      {selectedPhotoReview && (
+        <ReviewPhotoModal review={selectedPhotoReview} onClose={() => setSelectedPhotoReview(null)} />
+      )}
     </>
   )
 })

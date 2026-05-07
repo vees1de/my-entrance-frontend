@@ -38,6 +38,21 @@ import apiClient from './client'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
+const resolveMediaUrl = (url: string | null | undefined): string | undefined => {
+  if (!url) return undefined
+  if (/^(https?:|blob:|data:)/i.test(url)) return url
+
+  const apiBase = import.meta.env.VITE_API_URL ?? '/api'
+  if (apiBase.startsWith('/')) return url.startsWith('/') ? url : `/${url}`
+
+  try {
+    const origin = new URL(apiBase).origin
+    return new URL(url.startsWith('/') ? url : `/${url}`, origin).toString()
+  } catch {
+    return url
+  }
+}
+
 // ── Mappers ─────────────────────────────────────────────────────
 
 const toLowerRating = (r: string): Rating =>
@@ -82,7 +97,7 @@ const mapReview = (r: ServerReview): Review => ({
   floor: r.floor,
   rating: toLowerRating(r.rating),
   comment: r.comment ?? undefined,
-  photoUrl: r.photoUrl ?? undefined,
+  photoUrl: resolveMediaUrl(r.photoUrl),
   cleanerId: r.cleaners?.[0]?.id,
   cleanerName: r.cleaners?.length
     ? r.cleaners.map((c) => c.name).join(', ')
@@ -130,7 +145,7 @@ const mapCleaner = (c: ServerCleaner): Cleaner => {
     floorsCompleted: c.floorsCompleted,
     floorsTotal: c.floorsPlanned,
     lastCleaningAt: c.lastCleaningAt ?? undefined,
-    lastPhotoUrl: c.lastPhotoUrl ?? undefined,
+    lastPhotoUrl: resolveMediaUrl(c.lastPhotoUrl),
     badReviewsToday: c.badReviewsToday,
     totalReviews: c.totalReviews,
     shift: c.shift ?? '',
@@ -154,6 +169,11 @@ const mapMetrics = (m: ServerMetrics): DayMetrics => ({
   reviewsBad: m.reviewsBad,
   activecleaners: m.activeCleaners,
   weeklyAvgRating: m.weeklyAvgRating ?? 0,
+})
+
+const mapCleaningRecord = (record: CleaningRecord): CleaningRecord => ({
+  ...record,
+  photoUrl: resolveMediaUrl(record.photoUrl) ?? '',
 })
 
 interface ServerAuth {
@@ -211,14 +231,14 @@ const realCleaningsApi = {
     form.append('entranceId', data.entranceId)
     form.append('floor', String(data.floor))
     form.append('photo', data.photo)
-    return apiClient.post<CleaningRecord>('/cleanings', form).then((r) => r.data)
+    return apiClient.post<CleaningRecord>('/cleanings', form).then((r) => mapCleaningRecord(r.data))
   },
   getToday: (cleanerId?: string): Promise<CleaningRecord[]> =>
     apiClient
       .get<CleaningRecord[]>('/cleanings/today', {
         params: cleanerId ? { cleanerId } : {},
       })
-      .then((r) => r.data),
+      .then((r) => r.data.map(mapCleaningRecord)),
 }
 
 const realCleanersApi = {

@@ -102,12 +102,13 @@ export default observer(function CleanerDashboard() {
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
+    if (!auth.hasHydrated) return
     if (!auth.isAuthenticated || auth.role !== 'cleaner') {
       navigate('/cleaner/login', { replace: true })
       return
     }
     cleaner.loadToday()
-  }, [])
+  }, [auth.hasHydrated, auth.isAuthenticated, auth.role])
 
   const handleSubmit = async (floor: number, photo: File) => {
     setSubmitError('')
@@ -119,7 +120,7 @@ export default observer(function CleanerDashboard() {
     }
   }
 
-  if (!auth.isAuthenticated) return null
+  if (!auth.hasHydrated || !auth.isAuthenticated) return null
 
   const today = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'long' })
 

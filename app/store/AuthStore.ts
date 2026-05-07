@@ -1,4 +1,4 @@
-import { makeAutoObservable, computed } from 'mobx'
+import { makeAutoObservable } from 'mobx'
 import type { LoginCredentials } from '../shared/types'
 import { authApi } from '../shared/api/index'
 
@@ -8,21 +8,25 @@ export class AuthStore {
   userId = ''
   userName = ''
   entranceId = ''
+  hasHydrated = false
   isLoading = false
   error = ''
 
   constructor() {
     makeAutoObservable(this)
-    this.hydrate()
   }
 
-  private hydrate() {
-    if (typeof window === 'undefined') return
+  hydrate() {
+    if (typeof window === 'undefined') {
+      this.hasHydrated = true
+      return
+    }
     this.token = localStorage.getItem('token') ?? ''
     this.role = (localStorage.getItem('role') as 'cleaner' | 'manager') ?? null
     this.userId = localStorage.getItem('userId') ?? ''
     this.userName = localStorage.getItem('userName') ?? ''
     this.entranceId = localStorage.getItem('entranceId') ?? ''
+    this.hasHydrated = true
   }
 
   get isAuthenticated() {

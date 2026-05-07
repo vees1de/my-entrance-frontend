@@ -16,7 +16,7 @@ let reviewId = 100
 let cleaningId = 100
 
 const MOCK_REVIEWS: Review[] = [
-  { id: '1', entranceId: 'e2', entrance: 2, floor: 4, rating: 'bad', comment: 'Не помыли пол на 4 этаже, пыль на перилах осталась.', cleanerId: 'c1', cleanerName: 'Анна Кравченко', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
+  { id: '1', entranceId: 'e2', entrance: 2, floor: 4, rating: 'bad', comment: 'Не помыли пол на 4 этаже, пыль на перилах осталась.', photoUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 420%22%3E%3Crect width=%22640%22 height=%22420%22 fill=%22%23eef1f6%22/%3E%3Crect x=%2272%22 y=%2270%22 width=%22496%22 height=%22280%22 rx=%2218%22 fill=%22%23fff%22 stroke=%22%23cbd5e1%22 stroke-width=%224%22/%3E%3Cpath d=%22M110 308l120-120 86 86 68-68 146 146H110z%22 fill=%22%2396ea28%22/%3E%3Ccircle cx=%22476%22 cy=%22132%22 r=%2242%22 fill=%22%23f59e0b%22/%3E%3C/svg%3E', cleanerId: 'c1', cleanerName: 'Анна Кравченко', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
   { id: '2', entranceId: 'e1', entrance: 1, floor: 2, rating: 'bad', comment: 'Лужа на лестничной клетке, мусор в углу не убран.', cleanerId: 'c2', cleanerName: 'Елена Митина', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString() },
   { id: '3', entranceId: 'e1', entrance: 1, floor: 3, rating: 'ok', comment: 'В целом нормально, но окно немытое.', cleanerId: 'c3', cleanerName: 'Ирина Соколова', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() },
   { id: '4', entranceId: 'e3', entrance: 3, floor: 5, rating: 'ok', comment: 'Запах хлорки слишком сильный.', cleanerId: 'c1', cleanerName: 'Анна Кравченко', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5.5).toISOString() },
@@ -74,6 +74,7 @@ export const mockReviewsApi = {
       floor: data.floor,
       rating: data.rating,
       comment: data.comment,
+      photoUrl: data.photo ? URL.createObjectURL(data.photo) : undefined,
       createdAt: new Date().toISOString(),
     }
     MOCK_REVIEWS.unshift(review)
