@@ -14,7 +14,9 @@ import type {
   CleanerStatus,
   CleaningRecord,
   DayMetrics,
+  Entrance,
   LoginCredentials,
+  QrGenerateRequest,
   Rating,
   Review,
   ReviewFilters,
@@ -196,6 +198,31 @@ const realMetricsApi = {
     apiClient.get<ServerMetrics>('/metrics/day').then((r) => mapMetrics(r.data)),
 }
 
+const realEntrancesApi = {
+  getAll: (): Promise<Entrance[]> =>
+    apiClient
+      .get<Array<{ id: string; number: number; address: string; floorsTotal: number }>>('/entrances')
+      .then((r) =>
+        r.data.map((e) => ({
+          id: e.id,
+          number: e.number,
+          address: e.address,
+          floorsTotal: e.floorsTotal,
+        })),
+      ),
+}
+
+const realQrApi = {
+  preview: (entranceId: string, floor: number): Promise<Blob> =>
+    apiClient
+      .get<Blob>(`/qr/${entranceId}/${floor}`, { responseType: 'blob' })
+      .then((r) => r.data),
+  generate: (req: QrGenerateRequest): Promise<Blob> =>
+    apiClient
+      .post<Blob>('/qr/generate', req, { responseType: 'blob' })
+      .then((r) => r.data),
+}
+
 // ── Exports ─────────────────────────────────────────────────────
 
 export const authApi = USE_MOCK ? mockAuth : realAuth
@@ -203,3 +230,5 @@ export const reviewsApi = USE_MOCK ? mockReviewsApi : realReviewsApi
 export const cleaningsApi = USE_MOCK ? mockCleaningsApi : realCleaningsApi
 export const cleanersApi = USE_MOCK ? mockCleanersApi : realCleanersApi
 export const metricsApi = USE_MOCK ? mockMetricsApi : realMetricsApi
+export const entrancesApi = realEntrancesApi
+export const qrApi = realQrApi

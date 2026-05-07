@@ -49,6 +49,26 @@ export interface DayMetrics {
   weeklyAvgRating: number
 }
 
+export interface Entrance {
+  id: string
+  number: number
+  address: string
+  floorsTotal: number
+}
+
+export type QrLayout = 'one-per-page' | 'grid-2x3'
+
+export interface QrGenerateRequest {
+  entranceId: string
+  floors: number[]
+  options?: {
+    title?: string
+    subtitle?: string
+    footer?: string
+    layout?: QrLayout
+  }
+}
+
 export interface ReviewFilters {
   rating?: Rating | ''
   entranceId?: string

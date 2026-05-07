@@ -89,6 +89,19 @@ export const Icons = {
       <path d="M6.5 5.5h1m3 0h1m-5 3h1m3 0h1m-5 3h1m3 0h1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   ),
+  navQr: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="10" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="2" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M10 10h2v2h-2zM14 10h2v2M10 14h2M14 14h2v2h-2z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+  download: (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M7 2v8m0 0l-3-3m3 3l3-3M2.5 12h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   navSettings: (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
       <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.4" />

@@ -10,5 +10,6 @@ export default [
     route('manager/overview', 'routes/manager.overview.tsx'),
     route('manager/reviews', 'routes/manager.reviews.tsx'),
     route('manager/cleaners', 'routes/manager.cleaners.tsx'),
+    route('manager/qr', 'routes/manager.qr.tsx'),
   ]),
 ] satisfies RouteConfig
