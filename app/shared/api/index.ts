@@ -19,6 +19,7 @@ import type {
   LoginCredentials,
   QrGenerateBuildingRequest,
   QrGenerateRequest,
+  QrResolveResponse,
   Rating,
   Review,
   ReviewFilters,
@@ -313,6 +314,8 @@ const realEntrancesApi = {
 }
 
 const realQrApi = {
+  resolve: (token: string): Promise<QrResolveResponse> =>
+    apiClient.get<QrResolveResponse>(`/qr/resolve/${token}`).then((r) => r.data),
   preview: (entranceId: string, floor: number): Promise<Blob> =>
     apiClient
       .get<Blob>(`/qr/${entranceId}/${floor}`, { responseType: 'blob' })

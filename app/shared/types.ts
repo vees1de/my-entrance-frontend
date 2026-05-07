@@ -102,6 +102,11 @@ export interface QrGenerateBuildingRequest {
   options?: QrGenerateRequest['options']
 }
 
+export interface QrResolveResponse {
+  entranceId: string
+  floor: number
+}
+
 export interface ReviewFilters {
   rating?: Rating | ''
   entranceId?: string

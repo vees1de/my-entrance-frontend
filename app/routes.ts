@@ -2,6 +2,8 @@ import { type RouteConfig, index, route, layout } from '@react-router/dev/routes
 
 export default [
   index('routes/home.tsx'),
+  route('r/:token', 'routes/review-token.tsx'),
+  route('review', 'routes/review-query.tsx'),
   route('review/:entranceId/:floor', 'routes/review.tsx'),
   route('cleaner/login', 'routes/cleaner.login.tsx'),
   route('cleaner/dashboard', 'routes/cleaner.dashboard.tsx'),

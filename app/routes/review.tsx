@@ -1,8 +1,9 @@
-import { useParams } from 'react-router'
+import { useParams, useSearchParams } from 'react-router'
 import { observer } from 'mobx-react-lite'
 import { useStore } from '../store/StoreContext'
 import { ReviewFormStore } from '../store/ReviewFormStore'
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
+import { qrApi } from '../shared/api'
 import { T, FONT } from '../shared/tokens'
 import { Button } from '../shared/ui/Button'
 import { PhotoUpload } from '../shared/ui/PhotoUpload'
@@ -169,18 +170,58 @@ const ReviewForm = observer(({ store, entranceId, floor }: { store: ReviewFormSt
 })
 
 export default observer(function ReviewPage() {
-  const { entranceId, floor } = useParams()
+  const { entranceId: pathEntranceId, floor: pathFloor, token } = useParams()
+  const [searchParams] = useSearchParams()
   const { reviewForm } = useStore()
+  const [resolved, setResolved] = useState<{ entranceId: string; floor: number } | null>(null)
+  const [resolving, setResolving] = useState(Boolean(token))
+  const [resolveError, setResolveError] = useState('')
 
-  const floorNum = Number(floor)
-  const isValid = entranceId && floor && !isNaN(floorNum) && floorNum > 0 && floorNum <= 25
+  useEffect(() => {
+    if (!token) {
+      setResolving(false)
+      return
+    }
+
+    let cancelled = false
+    setResolving(true)
+    setResolveError('')
+    qrApi
+      .resolve(token)
+      .then((data) => {
+        if (!cancelled) setResolved(data)
+      })
+      .catch(() => {
+        if (!cancelled) setResolveError('QR-код не найден или устарел.')
+      })
+      .finally(() => {
+        if (!cancelled) setResolving(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  const entranceId = resolved?.entranceId ?? pathEntranceId ?? searchParams.get('entranceId') ?? ''
+  const floorRaw = resolved?.floor ?? pathFloor ?? searchParams.get('floor') ?? ''
+  const floorNum = Number(floorRaw)
+  const isValid = entranceId && !isNaN(floorNum) && floorNum > 0 && floorNum <= 100
+
+  if (resolving) {
+    return (
+      <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 24 }}>
+        <Spinner size={32} />
+      </div>
+    )
+  }
 
   if (!isValid) {
     return (
       <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, padding: 24 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: T.text, marginBottom: 8 }}>Некорректная ссылка</div>
-          <div style={{ fontSize: 15, color: T.textMute }}>Проверьте QR-код и попробуйте снова.</div>
+          <div style={{ fontSize: 15, color: T.textMute }}>{resolveError || 'Проверьте QR-код и попробуйте снова.'}</div>
         </div>
       </div>
     )
@@ -200,7 +241,7 @@ export default observer(function ReviewPage() {
       }}
     >
       {reviewForm.isSubmitted ? <SuccessScreen /> : (
-        <ReviewForm store={reviewForm} entranceId={entranceId!} floor={floorNum} />
+        <ReviewForm store={reviewForm} entranceId={entranceId} floor={floorNum} />
       )}
     </div>
   )

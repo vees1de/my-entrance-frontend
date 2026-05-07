@@ -15,7 +15,8 @@ apiClient.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       const path = window.location.pathname
-      const isPublic = path === '/' || path.startsWith('/review/') || path.endsWith('/login')
+      const isPublic =
+        path === '/' || path === '/review' || path.startsWith('/review/') || path.startsWith('/r/') || path.endsWith('/login')
       if (!isPublic) {
         localStorage.removeItem('token')
         localStorage.removeItem('role')
