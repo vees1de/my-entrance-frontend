@@ -181,7 +181,7 @@ export default observer(function ManagerReviews() {
                     </div>
                     <div><Badge variant={tone}>{label}</Badge></div>
                     <div style={{ color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Подъезд {r.entrance} · эт. {r.floor}
+                      {r.address ? `${r.address} · ` : ''}подъезд {r.entrance} · эт. {r.floor}
                     </div>
                     <div style={{ color: T.textMute, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.cleanerName ?? '—'}</div>
                     <div style={{ color: r.comment ? T.text : T.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { cleanersApi, entrancesApi } from '../shared/api'
-import type { Cleaner, Entrance } from '../shared/types'
+import { buildingsApi, cleanersApi, entrancesApi, streetsApi } from '../shared/api'
+import type { Building, Cleaner, Entrance, Street } from '../shared/types'
 import { T, FONT } from '../shared/tokens'
 import { Button } from '../shared/ui/Button'
 import { Input } from '../shared/ui/Input'
@@ -46,7 +46,8 @@ function TopBar({
 }
 
 interface NewEntranceForm {
-  address: string
+  streetName: string
+  buildingNumber: string
   number: string
   floorsTotal: string
 }
@@ -196,7 +197,7 @@ interface EntranceCardProps {
   entrance: Entrance
   cleaners: Cleaner[]
   busyId: string | null
-  onPatch: (id: string, dto: Partial<Pick<Entrance, 'number' | 'floorsTotal'>>) => Promise<void>
+  onPatch: (id: string, dto: Partial<Pick<Entrance, 'number'>>) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onAssign: (id: string, cleanerId: string) => Promise<void>
   onUnassign: (id: string, cleanerId: string) => Promise<void>
@@ -213,19 +214,16 @@ function EntranceCard({
 }: EntranceCardProps) {
   const [editing, setEditing] = useState(false)
   const [num, setNum] = useState(String(entrance.number))
-  const [floors, setFloors] = useState(String(entrance.floorsTotal))
   const busy = busyId === entrance.id
 
   const cancel = () => {
     setNum(String(entrance.number))
-    setFloors(String(entrance.floorsTotal))
     setEditing(false)
   }
   const save = async () => {
     const n = parseInt(num, 10)
-    const f = parseInt(floors, 10)
-    if (!Number.isFinite(n) || n < 1 || !Number.isFinite(f) || f < 1) return
-    await onPatch(entrance.id, { number: n, floorsTotal: f })
+    if (!Number.isFinite(n) || n < 1) return
+    await onPatch(entrance.id, { number: n })
     setEditing(false)
   }
 
@@ -261,22 +259,6 @@ function EntranceCard({
                 fontFamily: FONT,
               }}
             />
-            <span style={{ fontSize: 13, color: T.textDim, fontFamily: FONT }}>·</span>
-            <input
-              value={floors}
-              onChange={(e) => setFloors(e.target.value)}
-              type="number"
-              min={1}
-              style={{
-                width: 60,
-                fontSize: 14,
-                padding: '4px 8px',
-                border: `1px solid ${T.border2}`,
-                borderRadius: 6,
-                fontFamily: FONT,
-              }}
-            />
-            <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>этажей</span>
           </>
         ) : (
           <>
@@ -338,6 +320,8 @@ function etajSuffix(n: number) {
 }
 
 export default observer(function ManagerEntrances() {
+  const [streets, setStreets] = useState<Street[]>([])
+  const [buildings, setBuildings] = useState<Building[]>([])
   const [entrances, setEntrances] = useState<Entrance[]>([])
   const [cleaners, setCleaners] = useState<Cleaner[]>([])
   const [loading, setLoading] = useState(true)
@@ -345,7 +329,12 @@ export default observer(function ManagerEntrances() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState<NewEntranceForm>({ address: '', number: '', floorsTotal: '' })
+  const [form, setForm] = useState<NewEntranceForm>({
+    streetName: '',
+    buildingNumber: '',
+    number: '',
+    floorsTotal: '',
+  })
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
 
@@ -353,7 +342,14 @@ export default observer(function ManagerEntrances() {
     setLoading(true)
     setError('')
     try {
-      const [list, cls] = await Promise.all([entrancesApi.getAll(), cleanersApi.getAll()])
+      const [streetList, buildingList, list, cls] = await Promise.all([
+        streetsApi.getAll(),
+        buildingsApi.getAll(),
+        entrancesApi.getAll(),
+        cleanersApi.getAll(),
+      ])
+      setStreets(streetList)
+      setBuildings(buildingList)
       setEntrances(list)
       setCleaners(cls)
     } catch (e: any) {
@@ -368,23 +364,31 @@ export default observer(function ManagerEntrances() {
   }, [])
 
   const grouped = useMemo(() => {
-    const byAddr = new Map<string, Entrance[]>()
+    const byBuilding = new Map<string, Entrance[]>()
     for (const e of entrances) {
-      const key = e.address
-      if (!byAddr.has(key)) byAddr.set(key, [])
-      byAddr.get(key)!.push(e)
+      const key = e.buildingId
+      if (!byBuilding.has(key)) byBuilding.set(key, [])
+      byBuilding.get(key)!.push(e)
     }
-    return Array.from(byAddr.entries())
-      .map(([address, items]) => ({
-        address,
+    return Array.from(byBuilding.entries())
+      .map(([buildingId, items]) => {
+        const building = buildings.find((b) => b.id === buildingId)
+        return {
+          buildingId,
+          address: building?.address ?? items[0]?.address ?? '—',
+          floorsTotal: building?.floorsTotal ?? items[0]?.floorsTotal ?? 0,
+          streetName: building?.streetName ?? items[0]?.streetName ?? '',
+          buildingNumber: building?.number ?? items[0]?.buildingNumber ?? '',
+          streetId: building?.streetId ?? '',
         items: items.slice().sort((a, b) => a.number - b.number),
-      }))
+        }
+      })
       .sort((a, b) => a.address.localeCompare(b.address, 'ru'))
-  }, [entrances])
+  }, [buildings, entrances])
 
   const handlePatch = async (
     id: string,
-    dto: Partial<Pick<Entrance, 'number' | 'floorsTotal' | 'address'>>,
+    dto: Partial<Pick<Entrance, 'number'>>,
   ) => {
     setBusyId(id)
     setError('')
@@ -439,14 +443,29 @@ export default observer(function ManagerEntrances() {
     setAddError('')
     const n = parseInt(form.number, 10)
     const f = parseInt(form.floorsTotal, 10)
-    if (!form.address.trim() || !Number.isFinite(n) || n < 1 || !Number.isFinite(f) || f < 1) {
-      setAddError('Заполните адрес, номер подъезда (≥1) и число этажей (≥1)')
+    if (
+      !form.streetName.trim() ||
+      !form.buildingNumber.trim() ||
+      !Number.isFinite(n) ||
+      n < 1 ||
+      !Number.isFinite(f) ||
+      f < 1
+    ) {
+      setAddError('Заполните улицу, дом, номер подъезда (≥1) и число этажей дома (≥1)')
       return
     }
     setAdding(true)
     try {
-      await entrancesApi.create({ address: form.address.trim(), number: n, floorsTotal: f })
-      setForm({ address: form.address, number: '', floorsTotal: '' })
+      const streetName = form.streetName.trim()
+      const buildingNumber = form.buildingNumber.trim()
+      const street =
+        streets.find((s) => s.name.trim().toLowerCase() === streetName.toLowerCase()) ??
+        (await streetsApi.create({ name: streetName }))
+      const building =
+        buildings.find((b) => b.streetId === street.id && b.number.trim().toLowerCase() === buildingNumber.toLowerCase()) ??
+        (await buildingsApi.create({ streetId: street.id, number: buildingNumber, floorsTotal: f }))
+      await entrancesApi.create({ buildingId: building.id, number: n })
+      setForm({ streetName, buildingNumber, number: '', floorsTotal: String(building.floorsTotal) })
       setShowAdd(false)
       await refreshAll()
     } catch (err: any) {
@@ -496,16 +515,22 @@ export default observer(function ManagerEntrances() {
               borderRadius: 10,
               padding: 16,
               display: 'grid',
-              gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto',
+              gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto',
               gap: 12,
               alignItems: 'end',
             }}
           >
             <Input
-              label="Адрес дома"
-              value={form.address}
-              onChange={(v) => setForm({ ...form, address: v })}
-              placeholder="ул. Ленина, 5"
+              label="Улица"
+              value={form.streetName}
+              onChange={(v) => setForm({ ...form, streetName: v })}
+              placeholder="ул. Ленина"
+            />
+            <Input
+              label="Дом"
+              value={form.buildingNumber}
+              onChange={(v) => setForm({ ...form, buildingNumber: v })}
+              placeholder="12А"
             />
             <Input
               label="Подъезд №"
@@ -590,13 +615,21 @@ export default observer(function ManagerEntrances() {
                   {group.address}
                 </h3>
                 <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>
+                  · {group.floorsTotal} этаж{etajSuffix(group.floorsTotal)}
+                </span>
+                <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>
                   · {group.items.length} подъезд{group.items.length === 1 ? '' : group.items.length < 5 ? 'а' : 'ов'}
                 </span>
                 <span style={{ flex: 1 }} />
                 <button
                   type="button"
                   onClick={() => {
-                    setForm({ address: group.address, number: '', floorsTotal: '' })
+                    setForm({
+                      streetName: group.streetName,
+                      buildingNumber: group.buildingNumber,
+                      number: '',
+                      floorsTotal: String(group.floorsTotal),
+                    })
                     setShowAdd(true)
                     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
                   }}

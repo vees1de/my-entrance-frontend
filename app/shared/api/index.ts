@@ -10,16 +10,19 @@
 
 import type {
   AuthResponse,
+  Building,
   Cleaner,
   CleanerStatus,
   CleaningRecord,
   DayMetrics,
   Entrance,
   LoginCredentials,
+  QrGenerateBuildingRequest,
   QrGenerateRequest,
   Rating,
   Review,
   ReviewFilters,
+  Street,
   SubmitCleaningDto,
   SubmitReviewDto,
 } from '../types'
@@ -44,7 +47,20 @@ const toUpperRating = (r: Rating): string => r.toUpperCase()
 interface ServerReview {
   id: string
   entranceId: string
-  entrance: { id: string; number: number; address: string }
+  entrance: {
+    id: string
+    number: number
+    address: string
+    streetName?: string | null
+    buildingNumber?: string | null
+    entranceNumber?: number
+    floorsTotal?: number | null
+  }
+  address?: string
+  streetName?: string | null
+  buildingNumber?: string | null
+  entranceNumber?: number
+  floorsTotal?: number | null
   floor: number
   rating: 'BAD' | 'OK' | 'GOOD'
   comment: string | null
@@ -56,7 +72,12 @@ interface ServerReview {
 const mapReview = (r: ServerReview): Review => ({
   id: r.id,
   entranceId: r.entranceId,
-  entrance: r.entrance?.number ?? 0,
+  entrance: r.entranceNumber ?? r.entrance?.entranceNumber ?? r.entrance?.number ?? 0,
+  address: r.address ?? r.entrance?.address,
+  streetName: r.streetName ?? r.entrance?.streetName ?? undefined,
+  buildingNumber: r.buildingNumber ?? r.entrance?.buildingNumber ?? undefined,
+  entranceNumber: r.entranceNumber ?? r.entrance?.entranceNumber ?? r.entrance?.number,
+  floorsTotal: r.floorsTotal ?? r.entrance?.floorsTotal ?? undefined,
   floor: r.floor,
   rating: toLowerRating(r.rating),
   comment: r.comment ?? undefined,
@@ -73,7 +94,16 @@ interface ServerCleaner {
   name: string
   phone: string | null
   shift: string | null
-  entrances: Array<{ id: string; number: number; address: string; floorsTotal: number }>
+  entrances: Array<{
+    id: string
+    buildingId?: string
+    number: number
+    address: string
+    streetName?: string | null
+    buildingNumber?: string | null
+    entranceNumber?: number
+    floorsTotal: number
+  }>
   floorsPlanned: number
   floorsCompleted: number
   status: CleanerStatus
@@ -162,6 +192,8 @@ const realReviewsApi = {
     const params: Record<string, string | boolean> = {}
     if (filters.rating) params.rating = toUpperRating(filters.rating as Rating)
     if (filters.entranceId) params.entranceId = filters.entranceId
+    if (filters.streetId) params.streetId = filters.streetId
+    if (filters.buildingId) params.buildingId = filters.buildingId
     if (filters.cleanerId) params.cleanerId = filters.cleanerId
     if (filters.dateFrom) params.dateFrom = filters.dateFrom
     if (filters.dateTo) params.dateTo = filters.dateTo
@@ -200,42 +232,78 @@ const realMetricsApi = {
 
 interface ServerEntranceWithAssignments {
   id: string
+  buildingId: string
   number: number
   address: string
+  streetName?: string | null
+  buildingNumber?: string | null
+  entranceNumber?: number
   floorsTotal: number
   assignments?: Array<{ cleanerId: string; cleaner: { id: string; name: string } }>
 }
 
+interface ServerBuilding {
+  id: string
+  streetId: string
+  number: string
+  floorsTotal: number
+  entrancesCount?: number | null
+  createdAt?: string
+  street: { id: string; name: string; city?: string | null }
+}
+
+const mapBuilding = (b: ServerBuilding): Building => ({
+  id: b.id,
+  streetId: b.streetId,
+  number: b.number,
+  floorsTotal: b.floorsTotal,
+  entrancesCount: b.entrancesCount,
+  address: `${b.street.name}, д. ${b.number}`,
+  streetName: b.street.name,
+  createdAt: b.createdAt,
+})
+
+const mapEntrance = (e: ServerEntranceWithAssignments): Entrance => ({
+  id: e.id,
+  buildingId: e.buildingId,
+  number: e.entranceNumber ?? e.number,
+  address: e.address,
+  streetName: e.streetName,
+  buildingNumber: e.buildingNumber,
+  entranceNumber: e.entranceNumber ?? e.number,
+  floorsTotal: e.floorsTotal,
+  assignedCleanerIds: e.assignments?.map((a) => a.cleanerId) ?? [],
+})
+
+const realStreetsApi = {
+  getAll: (): Promise<Street[]> => apiClient.get<Street[]>('/streets').then((r) => r.data),
+  create: (dto: { name: string; city?: string }): Promise<Street> =>
+    apiClient.post<Street>('/streets', dto).then((r) => r.data),
+}
+
+const realBuildingsApi = {
+  getAll: (streetId?: string): Promise<Building[]> =>
+    apiClient
+      .get<ServerBuilding[]>('/buildings', { params: streetId ? { streetId } : {} })
+      .then((r) => r.data.map(mapBuilding)),
+  create: (dto: { streetId: string; number: string; floorsTotal: number }): Promise<Building> =>
+    apiClient.post<ServerBuilding>('/buildings', dto).then((r) => mapBuilding(r.data)),
+}
+
 const realEntrancesApi = {
-  getAll: (): Promise<Entrance[]> =>
-    apiClient.get<ServerEntranceWithAssignments[]>('/entrances').then((r) =>
-      r.data.map((e) => ({
-        id: e.id,
-        number: e.number,
-        address: e.address,
-        floorsTotal: e.floorsTotal,
-        assignedCleanerIds: e.assignments?.map((a) => a.cleanerId) ?? [],
-      })),
-    ),
-  create: (dto: { number: number; address: string; floorsTotal: number }): Promise<Entrance> =>
-    apiClient.post<ServerEntranceWithAssignments>('/entrances', dto).then((r) => ({
-      id: r.data.id,
-      number: r.data.number,
-      address: r.data.address,
-      floorsTotal: r.data.floorsTotal,
-      assignedCleanerIds: [],
-    })),
+  getAll: (buildingId?: string): Promise<Entrance[]> =>
+    apiClient
+      .get<ServerEntranceWithAssignments[]>('/entrances', {
+        params: buildingId ? { buildingId } : {},
+      })
+      .then((r) => r.data.map(mapEntrance)),
+  create: (dto: { buildingId: string; number: number }): Promise<Entrance> =>
+    apiClient.post<ServerEntranceWithAssignments>('/entrances', dto).then((r) => mapEntrance(r.data)),
   update: (
     id: string,
-    dto: { number?: number; address?: string; floorsTotal?: number },
+    dto: { buildingId?: string; number?: number },
   ): Promise<Entrance> =>
-    apiClient.patch<ServerEntranceWithAssignments>(`/entrances/${id}`, dto).then((r) => ({
-      id: r.data.id,
-      number: r.data.number,
-      address: r.data.address,
-      floorsTotal: r.data.floorsTotal,
-      assignedCleanerIds: [],
-    })),
+    apiClient.patch<ServerEntranceWithAssignments>(`/entrances/${id}`, dto).then((r) => mapEntrance(r.data)),
   remove: (id: string): Promise<void> =>
     apiClient.delete(`/entrances/${id}`).then(() => undefined),
   assign: (id: string, cleanerId: string) =>
@@ -253,6 +321,10 @@ const realQrApi = {
     apiClient
       .post<Blob>('/qr/generate', req, { responseType: 'blob' })
       .then((r) => r.data),
+  generateBuilding: (req: QrGenerateBuildingRequest): Promise<Blob> =>
+    apiClient
+      .post<Blob>('/qr/generate-building', req, { responseType: 'blob' })
+      .then((r) => r.data),
 }
 
 // ── Exports ─────────────────────────────────────────────────────
@@ -262,5 +334,7 @@ export const reviewsApi = USE_MOCK ? mockReviewsApi : realReviewsApi
 export const cleaningsApi = USE_MOCK ? mockCleaningsApi : realCleaningsApi
 export const cleanersApi = USE_MOCK ? mockCleanersApi : realCleanersApi
 export const metricsApi = USE_MOCK ? mockMetricsApi : realMetricsApi
+export const streetsApi = realStreetsApi
+export const buildingsApi = realBuildingsApi
 export const entrancesApi = realEntrancesApi
 export const qrApi = realQrApi

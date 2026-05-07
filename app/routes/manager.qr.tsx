@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { observer } from 'mobx-react-lite'
-import { entrancesApi, qrApi } from '../shared/api'
-import type { Entrance, QrLayout } from '../shared/types'
+import { buildingsApi, entrancesApi, qrApi } from '../shared/api'
+import type { Building, Entrance, QrLayout } from '../shared/types'
 import { T, FONT } from '../shared/tokens'
 import { Button } from '../shared/ui/Button'
 import { Input } from '../shared/ui/Input'
@@ -78,6 +78,7 @@ function Card({
 }
 
 export default observer(function ManagerQr() {
+  const [buildings, setBuildings] = useState<Building[]>([])
   const [entrances, setEntrances] = useState<Entrance[]>([])
   const [loadingList, setLoadingList] = useState(true)
   const [error, setError] = useState('')
@@ -91,16 +92,21 @@ export default observer(function ManagerQr() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewBusy, setPreviewBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
+  const [buildingDownloadBusy, setBuildingDownloadBusy] = useState(false)
 
   const entrance = useMemo(
     () => entrances.find((e) => e.id === entranceId),
     [entrances, entranceId],
   )
+  const building = useMemo(
+    () => buildings.find((b) => b.id === entrance?.buildingId),
+    [buildings, entrance?.buildingId],
+  )
 
   useEffect(() => {
-    entrancesApi
-      .getAll()
-      .then((list) => {
+    Promise.all([buildingsApi.getAll(), entrancesApi.getAll()])
+      .then(([buildingList, list]) => {
+        setBuildings(buildingList)
         setEntrances(list)
         if (list.length && !entranceId) setEntranceId(list[0].id)
       })
@@ -187,6 +193,35 @@ export default observer(function ManagerQr() {
       setError(e?.message ?? 'Ошибка генерации PDF')
     } finally {
       setDownloadBusy(false)
+    }
+  }
+
+  const handleDownloadBuilding = async () => {
+    if (!building) return
+    setBuildingDownloadBusy(true)
+    setError('')
+    try {
+      const blob = await qrApi.generateBuilding({
+        buildingId: building.id,
+        options: {
+          title: title || undefined,
+          subtitle: undefined,
+          footer: footer || undefined,
+          layout,
+        },
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `qr-dom-${building.number}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setError(e?.message ?? 'Ошибка генерации PDF по дому')
+    } finally {
+      setBuildingDownloadBusy(false)
     }
   }
 
@@ -279,7 +314,7 @@ export default observer(function ManagerQr() {
               </div>
               {entrance && (
                 <div style={{ fontSize: 12.5, color: T.textDim, fontFamily: FONT }}>
-                  Этажей: {entrance.floorsTotal}
+                  {entrance.address} · Этажей: {entrance.floorsTotal}
                 </div>
               )}
             </div>
@@ -417,6 +452,15 @@ export default observer(function ManagerQr() {
               leading={Icons.download}
             >
               {downloadBusy ? <Spinner size={16} color="#373C46" /> : 'Скачать PDF'}
+            </Button>
+            <Button
+              kind="secondary"
+              size="lg"
+              onClick={handleDownloadBuilding}
+              disabled={!building || buildingDownloadBusy}
+              leading={Icons.download}
+            >
+              {buildingDownloadBusy ? <Spinner size={16} color={T.text} /> : 'PDF по дому'}
             </Button>
           </div>
         </div>

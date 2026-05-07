@@ -5,6 +5,11 @@ export interface Review {
   id: string
   entranceId: string
   entrance: number
+  address?: string
+  streetName?: string
+  buildingNumber?: string
+  entranceNumber?: number
+  floorsTotal?: number
   floor: number
   rating: Rating
   comment?: string
@@ -40,6 +45,24 @@ export interface Cleaner {
   shift: string
 }
 
+export interface Street {
+  id: string
+  name: string
+  city?: string | null
+  createdAt?: string
+}
+
+export interface Building {
+  id: string
+  streetId: string
+  number: string
+  floorsTotal: number
+  entrancesCount?: number | null
+  address: string
+  streetName: string
+  createdAt?: string
+}
+
 export interface DayMetrics {
   cleaningsDone: number
   cleaningsPlanned: number
@@ -51,8 +74,12 @@ export interface DayMetrics {
 
 export interface Entrance {
   id: string
+  buildingId: string
   number: number
   address: string
+  streetName?: string | null
+  buildingNumber?: string | null
+  entranceNumber?: number
   floorsTotal: number
   assignedCleanerIds?: string[]
 }
@@ -70,9 +97,16 @@ export interface QrGenerateRequest {
   }
 }
 
+export interface QrGenerateBuildingRequest {
+  buildingId: string
+  options?: QrGenerateRequest['options']
+}
+
 export interface ReviewFilters {
   rating?: Rating | ''
   entranceId?: string
+  streetId?: string
+  buildingId?: string
   cleanerId?: string
   dateFrom?: string
   dateTo?: string

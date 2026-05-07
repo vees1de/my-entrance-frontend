@@ -58,7 +58,7 @@ function ReviewRow({ review }: { review: Review }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Badge variant={tone}>{label}</Badge>
           <span style={{ fontSize: 12, color: T.textMute, fontWeight: 500, fontFamily: FONT }}>
-            Подъезд {review.entrance} · эт. {review.floor}
+            {review.address ? `${review.address} · ` : ''}подъезд {review.entrance} · эт. {review.floor}
           </span>
           <span style={{ fontSize: 12, color: T.textDim, marginLeft: 'auto', fontFamily: FONT }}>{time}</span>
         </div>
