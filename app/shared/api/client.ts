@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'https://api.example.com',
+  baseURL: import.meta.env.VITE_API_URL ?? '/api',
 })
 
 apiClient.interceptors.request.use((config) => {
@@ -14,14 +14,18 @@ apiClient.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('token')
-      localStorage.removeItem('role')
-      localStorage.removeItem('userId')
-      localStorage.removeItem('userName')
-      window.location.href = '/login'
+      const path = window.location.pathname
+      const isPublic = path === '/' || path.startsWith('/review/') || path.endsWith('/login')
+      if (!isPublic) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('role')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('userName')
+        window.location.href = '/'
+      }
     }
     return Promise.reject(err)
-  }
+  },
 )
 
 export default apiClient
