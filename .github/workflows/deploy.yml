@@ -1,0 +1,99 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod-frontend
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Typecheck (best-effort)
+        continue-on-error: true
+        run: npm run typecheck
+      - name: Production build
+        env:
+          VITE_API_URL: /api
+          VITE_USE_MOCK: 'false'
+        run: npm run build
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - name: Verify required secrets
+        run: |
+          missing=()
+          [ -n "${{ secrets.DEPLOY_SSH_KEY }}" ] || missing+=("DEPLOY_SSH_KEY")
+          [ -n "${{ secrets.DEPLOY_HOST }}" ]    || missing+=("DEPLOY_HOST")
+          [ -n "${{ secrets.DEPLOY_USER }}" ]    || missing+=("DEPLOY_USER")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing GitHub Actions secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Load deploy SSH key into agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust deploy host
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keyscan -T 10 -t ed25519,rsa,ecdsa "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          test -s ~/.ssh/known_hosts || { echo "::error::ssh-keyscan returned nothing for $DEPLOY_HOST"; exit 1; }
+
+      - name: Deploy frontend on prod
+        run: |
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 "$DEPLOY_USER@$DEPLOY_HOST" bash -s <<'REMOTE'
+          set -euo pipefail
+
+          cd /opt/my-entrance/frontend
+          git fetch --all --prune
+          git reset --hard origin/main
+
+          cd /opt/my-entrance
+          # Run heavy build under nohup — vite build on the 1.8 GB host has
+          # otherwise dropped the SSH session under memory pressure.
+          : > /tmp/ci-deploy-frontend.log
+          nohup docker compose --env-file .env up -d --build frontend \
+            > /tmp/ci-deploy-frontend.log 2>&1 < /dev/null &
+          BUILD_PID=$!
+
+          while kill -0 "$BUILD_PID" 2>/dev/null; do
+            sleep 5
+            tail -n 1 /tmp/ci-deploy-frontend.log 2>/dev/null || true
+          done
+          wait "$BUILD_PID" || { echo "::error::frontend build/up failed"; tail -n 80 /tmp/ci-deploy-frontend.log; exit 1; }
+          tail -n 20 /tmp/ci-deploy-frontend.log
+
+          docker image prune -f >/dev/null
+
+          # Wait until the SSR server starts answering
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3011/ | grep -qE '^(200|301|302)$'; then
+              echo "Frontend up after $((i * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Frontend did not respond on :3011 within 120s"
+          docker ps -a
+          docker logs --tail 80 my-entrance-frontend || true
+          exit 1
+          REMOTE
