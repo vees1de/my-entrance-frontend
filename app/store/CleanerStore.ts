@@ -15,19 +15,12 @@ export class CleanerStore {
   }
 
   async loadToday() {
-    if (!this.root.auth.userId) return
     this.isLoading = true
     this.error = ''
     try {
-      const records = await cleaningsApi.getToday(this.root.auth.userId)
+      const records = await cleaningsApi.getToday()
       this.todayRecords = records
-      if (records.length === 0) {
-        this.status = 'not_started'
-      } else if (records.length >= 5) {
-        this.status = 'done'
-      } else {
-        this.status = 'in_progress'
-      }
+      this.status = records.length === 0 ? 'not_started' : 'in_progress'
     } catch (e: any) {
       this.error = e.message ?? 'Ошибка загрузки'
     } finally {
@@ -35,23 +28,22 @@ export class CleanerStore {
     }
   }
 
-  async submitCleaning(floor: number, photo: File) {
-    if (!this.root.auth.userId || !this.root.auth.entranceId) return
+  async submitCleaning(floor: number, photo: File, entranceId?: string) {
+    const resolvedEntranceId = entranceId ?? this.root.auth.entranceId
+    if (!this.root.auth.userId || !resolvedEntranceId) {
+      throw new Error('Нет данных о подъезде')
+    }
     this.isSubmitting = true
     this.error = ''
     try {
       const record = await cleaningsApi.submit({
         cleanerId: this.root.auth.userId,
-        entranceId: this.root.auth.entranceId,
+        entranceId: resolvedEntranceId,
         floor,
         photo,
       })
-      this.todayRecords.push(record)
-      if (this.todayRecords.length >= 5) {
-        this.status = 'done'
-      } else {
-        this.status = 'in_progress'
-      }
+      this.todayRecords = [record, ...this.todayRecords]
+      this.status = 'in_progress'
     } catch (e: any) {
       this.error = e.message ?? 'Ошибка отправки'
       throw e

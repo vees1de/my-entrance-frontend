@@ -22,8 +22,14 @@ export interface Review {
 export interface CleaningRecord {
   id: string
   cleanerId: string
+  cleanerName?: string
   entranceId: string
   floor: number
+  address?: string
+  streetName?: string
+  buildingNumber?: string
+  entranceNumber?: number
+  floorsTotal?: number
   photoUrl: string
   createdAt: string
 }

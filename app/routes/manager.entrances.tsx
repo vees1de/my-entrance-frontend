@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { buildingsApi, cleanersApi, entrancesApi, streetsApi } from '../shared/api'
-import type { Building, Cleaner, Entrance, Street } from '../shared/types'
+import { buildingsApi, entrancesApi, streetsApi } from '../shared/api'
+import type { Building, Entrance, Street } from '../shared/types'
 import { T, FONT } from '../shared/tokens'
 import { Button } from '../shared/ui/Button'
 import { Input } from '../shared/ui/Input'
@@ -12,306 +12,7 @@ export function meta() {
   return [{ title: 'Дома и подъезды — Мой подъезд' }]
 }
 
-function TopBar({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string
-  subtitle?: string
-  action?: React.ReactNode
-}) {
-  return (
-    <div
-      style={{
-        height: 60,
-        padding: '0 24px',
-        borderBottom: `1px solid ${T.divider}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-        flexShrink: 0,
-        background: T.bg,
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: T.text }}>{title}</div>
-        {subtitle && (
-          <div style={{ fontSize: 12.5, color: T.textDim, marginTop: 1 }}>{subtitle}</div>
-        )}
-      </div>
-      {action}
-    </div>
-  )
-}
-
-interface NewEntranceForm {
-  streetName: string
-  buildingNumber: string
-  number: string
-  floorsTotal: string
-}
-
-function CleanerChips({
-  entrance,
-  cleaners,
-  onAssign,
-  onUnassign,
-  busy,
-}: {
-  entrance: Entrance
-  cleaners: Cleaner[]
-  onAssign: (cleanerId: string) => void
-  onUnassign: (cleanerId: string) => void
-  busy: boolean
-}) {
-  const assigned = entrance.assignedCleanerIds ?? []
-  const available = cleaners.filter((c) => !assigned.includes(c.id))
-  const [picking, setPicking] = useState(false)
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div
-        style={{
-          fontSize: 11.5,
-          color: T.textMute,
-          fontWeight: 500,
-          letterSpacing: 0.2,
-          textTransform: 'uppercase',
-          fontFamily: FONT,
-        }}
-      >
-        Уборщицы
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-        {assigned.length === 0 && !picking && (
-          <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>не назначены</span>
-        )}
-        {assigned.map((id) => {
-          const c = cleaners.find((x) => x.id === id)
-          if (!c) return null
-          return (
-            <span
-              key={id}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 4px 4px 10px',
-                borderRadius: 999,
-                background: T.bg2,
-                border: `1px solid ${T.border}`,
-                fontSize: 12,
-                fontWeight: 600,
-                color: T.text,
-                fontFamily: FONT,
-              }}
-            >
-              {c.name}
-              <button
-                type="button"
-                onClick={() => !busy && onUnassign(id)}
-                disabled={busy}
-                title="Отвязать"
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: 'transparent',
-                  color: T.textDim,
-                  cursor: busy ? 'default' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {Icons.close}
-              </button>
-            </span>
-          )
-        })}
-        {picking ? (
-          <select
-            autoFocus
-            disabled={busy}
-            defaultValue=""
-            onChange={(e) => {
-              const id = e.target.value
-              if (id) {
-                onAssign(id)
-                setPicking(false)
-              }
-            }}
-            onBlur={() => setPicking(false)}
-            style={{
-              fontSize: 12,
-              padding: '4px 8px',
-              borderRadius: 999,
-              border: `1px solid ${T.border}`,
-              background: T.surface,
-              color: T.text,
-              fontFamily: FONT,
-            }}
-          >
-            <option value="" disabled>
-              Выбрать…
-            </option>
-            {available.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          available.length > 0 && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPicking(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 10px',
-                borderRadius: 999,
-                border: `1px dashed ${T.border2}`,
-                background: 'transparent',
-                color: T.textMute,
-                fontSize: 12,
-                cursor: busy ? 'default' : 'pointer',
-                fontFamily: FONT,
-              }}
-            >
-              {Icons.plus}
-              <span>добавить</span>
-            </button>
-          )
-        )}
-      </div>
-    </div>
-  )
-}
-
-interface EntranceCardProps {
-  entrance: Entrance
-  cleaners: Cleaner[]
-  busyId: string | null
-  onPatch: (id: string, dto: Partial<Pick<Entrance, 'number'>>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-  onAssign: (id: string, cleanerId: string) => Promise<void>
-  onUnassign: (id: string, cleanerId: string) => Promise<void>
-}
-
-function EntranceCard({
-  entrance,
-  cleaners,
-  busyId,
-  onPatch,
-  onDelete,
-  onAssign,
-  onUnassign,
-}: EntranceCardProps) {
-  const [editing, setEditing] = useState(false)
-  const [num, setNum] = useState(String(entrance.number))
-  const busy = busyId === entrance.id
-
-  const cancel = () => {
-    setNum(String(entrance.number))
-    setEditing(false)
-  }
-  const save = async () => {
-    const n = parseInt(num, 10)
-    if (!Number.isFinite(n) || n < 1) return
-    await onPatch(entrance.id, { number: n })
-    setEditing(false)
-  }
-
-  return (
-    <div
-      style={{
-        background: T.surface,
-        border: `1px solid ${T.border}`,
-        borderRadius: 10,
-        padding: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        opacity: busy ? 0.6 : 1,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        {editing ? (
-          <>
-            <span style={{ fontSize: 13, color: T.textMute, fontFamily: FONT }}>Подъезд</span>
-            <input
-              value={num}
-              onChange={(e) => setNum(e.target.value)}
-              type="number"
-              min={1}
-              style={{
-                width: 60,
-                fontSize: 16,
-                fontWeight: 700,
-                padding: '4px 8px',
-                border: `1px solid ${T.border2}`,
-                borderRadius: 6,
-                fontFamily: FONT,
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <span style={{ fontSize: 16, fontWeight: 700, color: T.text, fontFamily: FONT }}>
-              Подъезд {entrance.number}
-            </span>
-            <span style={{ fontSize: 12.5, color: T.textDim, fontFamily: FONT }}>
-              · {entrance.floorsTotal} этаж{etajSuffix(entrance.floorsTotal)}
-            </span>
-          </>
-        )}
-        <span style={{ flex: 1 }} />
-        {editing ? (
-          <>
-            <Button kind="ghost" size="sm" onClick={cancel} disabled={busy}>
-              Отмена
-            </Button>
-            <Button size="sm" onClick={save} disabled={busy}>
-              Сохранить
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button kind="ghost" size="sm" onClick={() => setEditing(true)}>
-              Изменить
-            </Button>
-            <Button
-              kind="danger"
-              size="sm"
-              onClick={() => {
-                if (confirm(`Удалить подъезд ${entrance.number}?`)) onDelete(entrance.id)
-              }}
-              disabled={busy}
-            >
-              Удалить
-            </Button>
-          </>
-        )}
-      </div>
-
-      <CleanerChips
-        entrance={entrance}
-        cleaners={cleaners}
-        onAssign={(cid) => onAssign(entrance.id, cid)}
-        onUnassign={(cid) => onUnassign(entrance.id, cid)}
-        busy={busy}
-      />
-    </div>
-  )
-}
-
 function etajSuffix(n: number) {
-  // 1 — этаж, 2-4 — этажа, 5+ — этажей. (10..19 — этажей.)
   const mod10 = n % 10
   const mod100 = n % 100
   if (mod10 === 1 && mod100 !== 11) return ''
@@ -319,39 +20,451 @@ function etajSuffix(n: number) {
   return 'ей'
 }
 
+function podezdSuffix(n: number) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return ''
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'а'
+  return 'ов'
+}
+
+// ── Add Building Form ──────────────────────────────────────────────
+
+function AddBuildingForm({
+  streets,
+  onCreated,
+  onCancel,
+}: {
+  streets: Street[]
+  onCreated: (b: Building) => void
+  onCancel: () => void
+}) {
+  const [streetName, setStreetName] = useState('')
+  const [number, setNumber] = useState('')
+  const [floors, setFloors] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const f = parseInt(floors, 10)
+    if (!streetName.trim() || !number.trim() || !Number.isFinite(f) || f < 1) {
+      setError('Заполните все поля')
+      return
+    }
+    setAdding(true)
+    try {
+      const existing = streets.find(
+        (s) => s.name.trim().toLowerCase() === streetName.trim().toLowerCase(),
+      )
+      const street = existing ?? (await streetsApi.create({ name: streetName.trim() }))
+      const building = await buildingsApi.create({
+        streetId: street.id,
+        number: number.trim(),
+        floorsTotal: f,
+      })
+      onCreated(building)
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? err?.message ?? 'Ошибка')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        padding: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 700, color: T.text, fontFamily: FONT }}>
+        Новый дом
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <Input
+          label="Улица"
+          value={streetName}
+          onChange={setStreetName}
+          placeholder="ул. Ленина"
+        />
+        <Input label="Номер дома" value={number} onChange={setNumber} placeholder="12А" />
+        <Input
+          label="Этажей в доме"
+          type="number"
+          value={floors}
+          onChange={setFloors}
+          placeholder="9"
+        />
+      </div>
+      {error && (
+        <div style={{ fontSize: 13, color: T.bad, fontFamily: FONT }}>{error}</div>
+      )}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button type="submit" disabled={adding}>
+          {adding ? <Spinner size={14} color="#373C46" /> : 'Создать дом'}
+        </Button>
+        <Button kind="ghost" onClick={onCancel} disabled={adding}>
+          Отмена
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// ── Building Card ──────────────────────────────────────────────────
+
+function BuildingCard({
+  building,
+  entrances,
+  onAddEntrance,
+  onEditBuilding,
+  onDeleteBuilding,
+  onEditEntrance,
+  onDeleteEntrance,
+  busy,
+}: {
+  building: Building
+  entrances: Entrance[]
+  onAddEntrance: (buildingId: string, number: number) => Promise<void>
+  onEditBuilding: (id: string, floorsTotal: number) => Promise<void>
+  onDeleteBuilding: (id: string) => Promise<void>
+  onEditEntrance: (id: string, number: number) => Promise<void>
+  onDeleteEntrance: (id: string) => Promise<void>
+  busy: string | null
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const [editingFloors, setEditingFloors] = useState(false)
+  const [floorsInput, setFloorsInput] = useState(String(building.floorsTotal))
+  const [addingEntrance, setAddingEntrance] = useState(false)
+  const [newEntranceNum, setNewEntranceNum] = useState('')
+  const [addErr, setAddErr] = useState('')
+
+  const isBusy = busy === building.id
+
+  const saveFloors = async () => {
+    const f = parseInt(floorsInput, 10)
+    if (!Number.isFinite(f) || f < 1) return
+    await onEditBuilding(building.id, f)
+    setEditingFloors(false)
+  }
+
+  const submitEntrance = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddErr('')
+    const n = parseInt(newEntranceNum, 10)
+    if (!Number.isFinite(n) || n < 1) {
+      setAddErr('Укажите номер подъезда (≥ 1)')
+      return
+    }
+    try {
+      await onAddEntrance(building.id, n)
+      setNewEntranceNum('')
+      setAddingEntrance(false)
+    } catch (err: any) {
+      setAddErr(err?.response?.data?.message ?? err?.message ?? 'Ошибка')
+    }
+  }
+
+  return (
+    <div
+      style={{
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        overflow: 'hidden',
+        opacity: isBusy ? 0.6 : 1,
+      }}
+    >
+      {/* Building header */}
+      <div
+        style={{
+          background: T.bg2,
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: T.textDim,
+            display: 'flex',
+            padding: 4,
+          }}
+        >
+          {expanded ? Icons.chevDown : Icons.chevRight}
+        </button>
+
+        <span style={{ color: T.accent, display: 'flex', flexShrink: 0 }}>{Icons.navBuilding}</span>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.text, fontFamily: FONT }}>
+            {building.address}
+          </div>
+          <div style={{ fontSize: 12, color: T.textDim, marginTop: 2, fontFamily: FONT }}>
+            {editingFloors ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  value={floorsInput}
+                  onChange={(e) => setFloorsInput(e.target.value)}
+                  type="number"
+                  min={1}
+                  style={{
+                    width: 52,
+                    fontSize: 12,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    border: `1px solid ${T.border2}`,
+                    fontFamily: FONT,
+                  }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveFloors()
+                    if (e.key === 'Escape') {
+                      setFloorsInput(String(building.floorsTotal))
+                      setEditingFloors(false)
+                    }
+                  }}
+                />
+                <span style={{ color: T.textMute }}>этажей</span>
+                <button
+                  type="button"
+                  onClick={saveFloors}
+                  style={{ fontSize: 11, color: T.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 600 }}
+                >
+                  ОК
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFloorsInput(String(building.floorsTotal)); setEditingFloors(false) }}
+                  style={{ fontSize: 11, color: T.textMute, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT }}
+                >
+                  Отмена
+                </button>
+              </span>
+            ) : (
+              <>
+                {building.floorsTotal} этаж{etajSuffix(building.floorsTotal)}
+                {' · '}
+                {entrances.length} подъезд{podezdSuffix(entrances.length)}
+                {' · '}
+                <button
+                  type="button"
+                  onClick={() => setEditingFloors(true)}
+                  style={{ fontSize: 11, color: T.textMute, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, textDecoration: 'underline' }}
+                >
+                  изменить этажи
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <Button
+          kind="danger"
+          size="sm"
+          disabled={isBusy || entrances.length > 0}
+          title={entrances.length > 0 ? 'Сначала удалите все подъезды' : ''}
+          onClick={() => {
+            if (confirm(`Удалить дом ${building.address}?`)) onDeleteBuilding(building.id)
+          }}
+        >
+          Удалить
+        </Button>
+      </div>
+
+      {/* Entrances */}
+      {expanded && (
+        <div style={{ background: T.bg, padding: '8px 16px 12px' }}>
+          {entrances.length === 0 && !addingEntrance && (
+            <div style={{ fontSize: 13, color: T.textDim, fontFamily: FONT, padding: '8px 0' }}>
+              Подъездов нет
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {entrances.map((e) => (
+              <EntranceRow
+                key={e.id}
+                entrance={e}
+                busy={busy === e.id}
+                onEdit={onEditEntrance}
+                onDelete={onDeleteEntrance}
+              />
+            ))}
+          </div>
+
+          {addingEntrance ? (
+            <form
+              onSubmit={submitEntrance}
+              style={{
+                marginTop: 8,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 8,
+              }}
+            >
+              <div style={{ width: 160 }}>
+                <Input
+                  label="Номер подъезда"
+                  type="number"
+                  value={newEntranceNum}
+                  onChange={(v) => { setNewEntranceNum(v); setAddErr('') }}
+                  placeholder="1"
+                />
+              </div>
+              <Button type="submit" size="sm">
+                Добавить
+              </Button>
+              <Button
+                kind="ghost"
+                size="sm"
+                onClick={() => { setAddingEntrance(false); setNewEntranceNum(''); setAddErr('') }}
+              >
+                Отмена
+              </Button>
+              {addErr && (
+                <span style={{ fontSize: 12, color: T.bad, fontFamily: FONT }}>{addErr}</span>
+              )}
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingEntrance(true)}
+              style={{
+                marginTop: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: `1px dashed ${T.border2}`,
+                background: 'none',
+                color: T.textMute,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: FONT,
+              }}
+            >
+              {Icons.plus}
+              <span>Добавить подъезд</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Entrance Row ───────────────────────────────────────────────────
+
+function EntranceRow({
+  entrance,
+  busy,
+  onEdit,
+  onDelete,
+}: {
+  entrance: Entrance
+  busy: boolean
+  onEdit: (id: string, number: number) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [num, setNum] = useState(String(entrance.number))
+
+  const save = async () => {
+    const n = parseInt(num, 10)
+    if (!Number.isFinite(n) || n < 1) return
+    await onEdit(entrance.id, n)
+    setEditing(false)
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 12px',
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: 8,
+        opacity: busy ? 0.5 : 1,
+      }}
+    >
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: T.bg2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: T.textMute, fontFamily: FONT, flexShrink: 0 }}>
+        {entrance.number}
+      </div>
+
+      {editing ? (
+        <>
+          <input
+            value={num}
+            onChange={(e) => setNum(e.target.value)}
+            type="number"
+            min={1}
+            autoFocus
+            style={{ width: 64, fontSize: 14, padding: '4px 8px', border: `1px solid ${T.border2}`, borderRadius: 6, fontFamily: FONT }}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setNum(String(entrance.number)); setEditing(false) } }}
+          />
+          <Button size="sm" onClick={save} disabled={busy}>Сохранить</Button>
+          <Button kind="ghost" size="sm" onClick={() => { setNum(String(entrance.number)); setEditing(false) }}>Отмена</Button>
+        </>
+      ) : (
+        <>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: T.text, fontFamily: FONT }}>
+            Подъезд {entrance.number}
+          </div>
+          <Button kind="ghost" size="sm" onClick={() => setEditing(true)}>Изменить</Button>
+          <Button
+            kind="danger"
+            size="sm"
+            disabled={busy}
+            onClick={() => { if (confirm(`Удалить подъезд ${entrance.number}?`)) onDelete(entrance.id) }}
+          >
+            Удалить
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Main Page ──────────────────────────────────────────────────────
+
 export default observer(function ManagerEntrances() {
   const [streets, setStreets] = useState<Street[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
   const [entrances, setEntrances] = useState<Entrance[]>([])
-  const [cleaners, setCleaners] = useState<Cleaner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busyId, setBusyId] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [showAddBuilding, setShowAddBuilding] = useState(false)
 
-  const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState<NewEntranceForm>({
-    streetName: '',
-    buildingNumber: '',
-    number: '',
-    floorsTotal: '',
-  })
-  const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState('')
-
-  const refreshAll = async () => {
+  const loadAll = async () => {
     setLoading(true)
     setError('')
     try {
-      const [streetList, buildingList, list, cls] = await Promise.all([
+      const [sl, bl, el] = await Promise.all([
         streetsApi.getAll(),
         buildingsApi.getAll(),
         entrancesApi.getAll(),
-        cleanersApi.getAll(),
       ])
-      setStreets(streetList)
-      setBuildings(buildingList)
-      setEntrances(list)
-      setCleaners(cls)
+      setStreets(sl)
+      setBuildings(bl)
+      setEntrances(el)
     } catch (e: any) {
       setError(e?.message ?? 'Не удалось загрузить данные')
     } finally {
@@ -359,222 +472,136 @@ export default observer(function ManagerEntrances() {
     }
   }
 
-  useEffect(() => {
-    refreshAll()
-  }, [])
+  useEffect(() => { loadAll() }, [])
 
-  const grouped = useMemo(() => {
-    const byBuilding = new Map<string, Entrance[]>()
+  const entrancesByBuilding = useMemo(() => {
+    const map = new Map<string, Entrance[]>()
     for (const e of entrances) {
-      const key = e.buildingId
-      if (!byBuilding.has(key)) byBuilding.set(key, [])
-      byBuilding.get(key)!.push(e)
+      const arr = map.get(e.buildingId) ?? []
+      arr.push(e)
+      map.set(e.buildingId, arr)
     }
-    return Array.from(byBuilding.entries())
-      .map(([buildingId, items]) => {
-        const building = buildings.find((b) => b.id === buildingId)
-        return {
-          buildingId,
-          address: building?.address ?? items[0]?.address ?? '—',
-          floorsTotal: building?.floorsTotal ?? items[0]?.floorsTotal ?? 0,
-          streetName: building?.streetName ?? items[0]?.streetName ?? '',
-          buildingNumber: building?.number ?? items[0]?.buildingNumber ?? '',
-          streetId: building?.streetId ?? '',
-        items: items.slice().sort((a, b) => a.number - b.number),
-        }
-      })
-      .sort((a, b) => a.address.localeCompare(b.address, 'ru'))
-  }, [buildings, entrances])
+    for (const arr of map.values()) arr.sort((a, b) => a.number - b.number)
+    return map
+  }, [entrances])
 
-  const handlePatch = async (
-    id: string,
-    dto: Partial<Pick<Entrance, 'number'>>,
-  ) => {
-    setBusyId(id)
+  const withError = (fn: () => Promise<void>) => async () => {
     setError('')
-    try {
-      await entrancesApi.update(id, dto)
-      await refreshAll()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Не удалось сохранить')
-    } finally {
-      setBusyId(null)
+    try { await fn() } catch (e: any) {
+      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка')
     }
   }
 
-  const handleDelete = async (id: string) => {
-    setBusyId(id)
+  const handleAddEntrance = async (buildingId: string, number: number) => {
+    setBusy(buildingId)
+    try {
+      const e = await entrancesApi.create({ buildingId, number })
+      setEntrances((prev) => [...prev, e])
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleEditBuilding = async (id: string, floorsTotal: number) => {
+    setBusy(id)
+    try {
+      const b = await buildingsApi.update(id, { floorsTotal })
+      setBuildings((prev) => prev.map((x) => (x.id === id ? b : x)))
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleDeleteBuilding = withError(async () => {
+    // Actual call done in card — error surfaced here
+  })
+
+  const handleDeleteBuildingById = async (id: string) => {
+    setBusy(id)
+    setError('')
+    try {
+      await buildingsApi.remove(id)
+      setBuildings((prev) => prev.filter((b) => b.id !== id))
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка удаления дома')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleEditEntrance = async (id: string, number: number) => {
+    setBusy(id)
+    setError('')
+    try {
+      const e = await entrancesApi.update(id, { number })
+      setEntrances((prev) => prev.map((x) => (x.id === id ? e : x)))
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleDeleteEntrance = async (id: string) => {
+    setBusy(id)
     setError('')
     try {
       await entrancesApi.remove(id)
-      await refreshAll()
+      setEntrances((prev) => prev.filter((e) => e.id !== id))
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Не удалось удалить')
+      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка удаления')
     } finally {
-      setBusyId(null)
+      setBusy(null)
     }
   }
-
-  const handleAssign = async (id: string, cleanerId: string) => {
-    setBusyId(id)
-    try {
-      await entrancesApi.assign(id, cleanerId)
-      await refreshAll()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка привязки')
-    } finally {
-      setBusyId(null)
-    }
-  }
-  const handleUnassign = async (id: string, cleanerId: string) => {
-    setBusyId(id)
-    try {
-      await entrancesApi.unassign(id, cleanerId)
-      await refreshAll()
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Ошибка отвязки')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setAddError('')
-    const n = parseInt(form.number, 10)
-    const f = parseInt(form.floorsTotal, 10)
-    if (
-      !form.streetName.trim() ||
-      !form.buildingNumber.trim() ||
-      !Number.isFinite(n) ||
-      n < 1 ||
-      !Number.isFinite(f) ||
-      f < 1
-    ) {
-      setAddError('Заполните улицу, дом, номер подъезда (≥1) и число этажей дома (≥1)')
-      return
-    }
-    setAdding(true)
-    try {
-      const streetName = form.streetName.trim()
-      const buildingNumber = form.buildingNumber.trim()
-      const street =
-        streets.find((s) => s.name.trim().toLowerCase() === streetName.toLowerCase()) ??
-        (await streetsApi.create({ name: streetName }))
-      const building =
-        buildings.find((b) => b.streetId === street.id && b.number.trim().toLowerCase() === buildingNumber.toLowerCase()) ??
-        (await buildingsApi.create({ streetId: street.id, number: buildingNumber, floorsTotal: f }))
-      await entrancesApi.create({ buildingId: building.id, number: n })
-      setForm({ streetName, buildingNumber, number: '', floorsTotal: String(building.floorsTotal) })
-      setShowAdd(false)
-      await refreshAll()
-    } catch (err: any) {
-      setAddError(err?.response?.data?.message ?? err?.message ?? 'Не удалось создать')
-    } finally {
-      setAdding(false)
-    }
-  }
-
-  const totalEntrances = entrances.length
-  const totalHouses = grouped.length
 
   return (
     <>
-      <TopBar
-        title="Дома и подъезды"
-        subtitle={
-          loading
-            ? 'Загрузка…'
-            : `${totalHouses} дом${etajSuffix(totalHouses) ? '' : ''}${
-                totalHouses % 10 === 1 && totalHouses % 100 !== 11 ? '' : 'а'
-              } · ${totalEntrances} подъезд${totalEntrances === 1 ? '' : totalEntrances < 5 ? 'а' : 'ов'}`
-        }
-        action={
-          <Button leading={Icons.plus} onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? 'Закрыть' : 'Добавить подъезд'}
-          </Button>
-        }
-      />
-
+      {/* TopBar */}
       <div
         style={{
-          flex: 1,
-          padding: 20,
-          overflow: 'auto',
+          height: 60,
+          padding: '0 24px',
+          borderBottom: `1px solid ${T.divider}`,
           display: 'flex',
-          flexDirection: 'column',
+          alignItems: 'center',
           gap: 16,
+          flexShrink: 0,
+          background: T.bg,
         }}
       >
-        {showAdd && (
-          <form
-            onSubmit={handleAdd}
-            style={{
-              background: T.surface,
-              border: `1px solid ${T.border}`,
-              borderRadius: 10,
-              padding: 16,
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto',
-              gap: 12,
-              alignItems: 'end',
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: T.text }}>Дома и подъезды</div>
+          {!loading && (
+            <div style={{ fontSize: 12.5, color: T.textDim, marginTop: 1 }}>
+              {buildings.length} дом{podezdSuffix(buildings.length)} · {entrances.length} подъезд{podezdSuffix(entrances.length)}
+            </div>
+          )}
+        </div>
+        <Button
+          leading={Icons.plus}
+          onClick={() => setShowAddBuilding((v) => !v)}
+        >
+          {showAddBuilding ? 'Закрыть' : 'Добавить дом'}
+        </Button>
+      </div>
+
+      <div style={{ flex: 1, padding: 20, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {showAddBuilding && (
+          <AddBuildingForm
+            streets={streets}
+            onCreated={(b) => {
+              setBuildings((prev) => [...prev, b])
+              setShowAddBuilding(false)
             }}
-          >
-            <Input
-              label="Улица"
-              value={form.streetName}
-              onChange={(v) => setForm({ ...form, streetName: v })}
-              placeholder="ул. Ленина"
-            />
-            <Input
-              label="Дом"
-              value={form.buildingNumber}
-              onChange={(v) => setForm({ ...form, buildingNumber: v })}
-              placeholder="12А"
-            />
-            <Input
-              label="Подъезд №"
-              type="number"
-              value={form.number}
-              onChange={(v) => setForm({ ...form, number: v })}
-              placeholder="1"
-            />
-            <Input
-              label="Этажей"
-              type="number"
-              value={form.floorsTotal}
-              onChange={(v) => setForm({ ...form, floorsTotal: v })}
-              placeholder="9"
-            />
-            <Button type="submit" size="lg" disabled={adding}>
-              {adding ? <Spinner size={16} color="#373C46" /> : 'Создать'}
-            </Button>
-            {addError && (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  fontSize: 13,
-                  color: T.bad,
-                  fontFamily: FONT,
-                }}
-              >
-                {addError}
-              </div>
-            )}
-          </form>
+            onCancel={() => setShowAddBuilding(false)}
+          />
         )}
 
         {error && (
-          <div
-            style={{
-              padding: '10px 14px',
-              background: T.badSoft,
-              color: T.bad,
-              borderRadius: 8,
-              fontSize: 13,
-              fontFamily: FONT,
-            }}
-          >
+          <div style={{ padding: '10px 14px', background: T.badSoft, color: T.bad, borderRadius: 8, fontSize: 13, fontFamily: FONT }}>
             {error}
           </div>
         )}
@@ -583,91 +610,27 @@ export default observer(function ManagerEntrances() {
           <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
             <Spinner size={32} />
           </div>
-        ) : grouped.length === 0 ? (
-          <div
-            style={{
-              padding: 40,
-              textAlign: 'center',
-              color: T.textDim,
-              fontFamily: FONT,
-              fontSize: 14,
-            }}
-          >
-            Подъездов ещё нет. Нажмите «Добавить подъезд», чтобы создать первый.
+        ) : buildings.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: T.textDim, fontFamily: FONT, fontSize: 14 }}>
+            Домов нет. Нажмите «Добавить дом», чтобы создать первый.
           </div>
         ) : (
-          grouped.map((group) => (
-            <section
-              key={group.address}
-              style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '0 4px' }}>
-                <span style={{ color: T.textMute }}>{Icons.navBuilding}</span>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: T.text,
-                    fontFamily: FONT,
-                  }}
-                >
-                  {group.address}
-                </h3>
-                <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>
-                  · {group.floorsTotal} этаж{etajSuffix(group.floorsTotal)}
-                </span>
-                <span style={{ fontSize: 12, color: T.textDim, fontFamily: FONT }}>
-                  · {group.items.length} подъезд{group.items.length === 1 ? '' : group.items.length < 5 ? 'а' : 'ов'}
-                </span>
-                <span style={{ flex: 1 }} />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm({
-                      streetName: group.streetName,
-                      buildingNumber: group.buildingNumber,
-                      number: '',
-                      floorsTotal: String(group.floorsTotal),
-                    })
-                    setShowAdd(true)
-                    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: 12,
-                    color: T.accent,
-                    cursor: 'pointer',
-                    fontFamily: FONT,
-                    fontWeight: 600,
-                  }}
-                >
-                  + ещё подъезд
-                </button>
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {group.items.map((e) => (
-                  <EntranceCard
-                    key={e.id}
-                    entrance={e}
-                    cleaners={cleaners}
-                    busyId={busyId}
-                    onPatch={handlePatch}
-                    onDelete={handleDelete}
-                    onAssign={handleAssign}
-                    onUnassign={handleUnassign}
-                  />
-                ))}
-              </div>
-            </section>
-          ))
+          buildings
+            .slice()
+            .sort((a, b) => a.address.localeCompare(b.address, 'ru'))
+            .map((building) => (
+              <BuildingCard
+                key={building.id}
+                building={building}
+                entrances={entrancesByBuilding.get(building.id) ?? []}
+                onAddEntrance={handleAddEntrance}
+                onEditBuilding={handleEditBuilding}
+                onDeleteBuilding={handleDeleteBuildingById}
+                onEditEntrance={handleEditEntrance}
+                onDeleteEntrance={handleDeleteEntrance}
+                busy={busy}
+              />
+            ))
         )}
       </div>
     </>

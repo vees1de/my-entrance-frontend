@@ -171,9 +171,42 @@ const mapMetrics = (m: ServerMetrics): DayMetrics => ({
   weeklyAvgRating: m.weeklyAvgRating ?? 0,
 })
 
-const mapCleaningRecord = (record: CleaningRecord): CleaningRecord => ({
-  ...record,
+interface ServerCleaningRecord {
+  id: string
+  cleaner?: { id: string; name: string }
+  cleanerId?: string
+  entranceId?: string
+  entrance?: {
+    id: string
+    address?: string
+    streetName?: string | null
+    buildingNumber?: string | null
+    entranceNumber?: number
+    floorsTotal?: number
+  }
+  address?: string
+  streetName?: string | null
+  buildingNumber?: string | null
+  entranceNumber?: number
+  floorsTotal?: number
+  floor: number
+  photoUrl: string
+  createdAt: string
+}
+
+const mapCleaningRecord = (record: ServerCleaningRecord): CleaningRecord => ({
+  id: record.id,
+  cleanerId: record.cleaner?.id ?? record.cleanerId ?? '',
+  cleanerName: record.cleaner?.name,
+  entranceId: record.entrance?.id ?? record.entranceId ?? '',
+  floor: record.floor,
+  address: record.address ?? record.entrance?.address,
+  streetName: record.streetName ?? record.entrance?.streetName ?? undefined,
+  buildingNumber: record.buildingNumber ?? record.entrance?.buildingNumber ?? undefined,
+  entranceNumber: record.entranceNumber ?? record.entrance?.entranceNumber,
+  floorsTotal: record.floorsTotal ?? record.entrance?.floorsTotal,
   photoUrl: resolveMediaUrl(record.photoUrl) ?? '',
+  createdAt: record.createdAt,
 })
 
 interface ServerAuth {
@@ -231,11 +264,11 @@ const realCleaningsApi = {
     form.append('entranceId', data.entranceId)
     form.append('floor', String(data.floor))
     form.append('photo', data.photo)
-    return apiClient.post<CleaningRecord>('/cleanings', form).then((r) => mapCleaningRecord(r.data))
+    return apiClient.post<ServerCleaningRecord>('/cleanings', form).then((r) => mapCleaningRecord(r.data))
   },
   getToday: (cleanerId?: string): Promise<CleaningRecord[]> =>
     apiClient
-      .get<CleaningRecord[]>('/cleanings/today', {
+      .get<ServerCleaningRecord[]>('/cleanings/today', {
         params: cleanerId ? { cleanerId } : {},
       })
       .then((r) => r.data.map(mapCleaningRecord)),
@@ -309,6 +342,10 @@ const realBuildingsApi = {
       .then((r) => r.data.map(mapBuilding)),
   create: (dto: { streetId: string; number: string; floorsTotal: number }): Promise<Building> =>
     apiClient.post<ServerBuilding>('/buildings', dto).then((r) => mapBuilding(r.data)),
+  update: (id: string, dto: { floorsTotal?: number }): Promise<Building> =>
+    apiClient.patch<ServerBuilding>(`/buildings/${id}`, dto).then((r) => mapBuilding(r.data)),
+  remove: (id: string): Promise<void> =>
+    apiClient.delete(`/buildings/${id}`).then(() => undefined),
 }
 
 const realEntrancesApi = {
