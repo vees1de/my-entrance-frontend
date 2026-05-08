@@ -15,13 +15,14 @@ interface ButtonProps {
   trailing?: ReactNode
   onClick?: () => void
   type?: 'button' | 'submit' | 'reset'
+  title?: string
 }
 
 const HEIGHTS: Record<Size, number> = { sm: 32, md: 40, lg: 48, xl: 56 }
 const FONT_SIZES: Record<Size, number> = { sm: 13, md: 14, lg: 16, xl: 17 }
 const PADDING: Record<Size, string> = { sm: '0 12px', md: '0 14px', lg: '0 20px', xl: '0 24px' }
 
-export function Button({ kind = 'primary', size = 'md', full, disabled, children, style, leading, trailing, onClick, type = 'button' }: ButtonProps) {
+export function Button({ kind = 'primary', size = 'md', full, disabled, children, style, leading, trailing, onClick, type = 'button', title }: ButtonProps) {
   const kindStyles: Record<Kind, CSSProperties> = {
     primary:   { background: disabled ? 'rgba(15,23,42,0.06)' : T.accent, color: disabled ? T.textOff : '#373C46' },
     secondary: { background: T.surface, color: T.text, border: `1px solid ${T.border2}` },
@@ -34,6 +35,7 @@ export function Button({ kind = 'primary', size = 'md', full, disabled, children
       type={type}
       disabled={disabled}
       onClick={onClick}
+      title={title}
       style={{
         height: HEIGHTS[size],
         padding: PADDING[size],

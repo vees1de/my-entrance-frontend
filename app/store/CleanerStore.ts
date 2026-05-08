@@ -18,7 +18,7 @@ export class CleanerStore {
     this.isLoading = true
     this.error = ''
     try {
-      const records = await cleaningsApi.getToday()
+      const records = await cleaningsApi.getToday(this.root.auth.userId)
       this.todayRecords = records
       this.status = records.length === 0 ? 'not_started' : 'in_progress'
     } catch (e: any) {
