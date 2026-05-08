@@ -385,6 +385,14 @@ const realQrApi = {
     apiClient
       .post<Blob>('/qr/generate-building', req, { responseType: 'blob' })
       .then((r) => r.data),
+  generateZip: (entranceId: string, floors: number[]): Promise<Blob> =>
+    apiClient
+      .post<Blob>('/qr/generate-zip', { entranceId, floors }, { responseType: 'blob' })
+      .then((r) => r.data),
+  generateBuildingZip: (buildingId: string): Promise<Blob> =>
+    apiClient
+      .post<Blob>('/qr/generate-building-zip', { buildingId }, { responseType: 'blob' })
+      .then((r) => r.data),
 }
 
 // ── Exports ─────────────────────────────────────────────────────

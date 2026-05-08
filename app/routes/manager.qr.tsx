@@ -12,6 +12,14 @@ export function meta() {
   return [{ title: 'QR-коды — Мой подъезд' }]
 }
 
+const zipIcon = (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M3 1h5l3 3v9H3V1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    <path d="M8 1v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    <path d="M6 5v1M6 7v1M6 9v1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  </svg>
+)
+
 // ── Section wrapper ────────────────────────────────────────────────
 
 function Section({
@@ -143,6 +151,8 @@ export default observer(function ManagerQr() {
   const [previewBusy, setPreviewBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [buildingDownloadBusy, setBuildingDownloadBusy] = useState(false)
+  const [zipBusy, setZipBusy] = useState(false)
+  const [buildingZipBusy, setBuildingZipBusy] = useState(false)
 
   useEffect(() => {
     Promise.all([buildingsApi.getAll(), entrancesApi.getAll()])
@@ -240,6 +250,34 @@ export default observer(function ManagerQr() {
       setError(e?.message ?? 'Ошибка генерации PDF по дому')
     } finally {
       setBuildingDownloadBusy(false)
+    }
+  }
+
+  const handleDownloadZip = async () => {
+    if (!entrance || orderedFloors.length === 0) return
+    setZipBusy(true)
+    setError('')
+    try {
+      const blob = await qrApi.generateZip(entrance.id, orderedFloors)
+      triggerDownload(blob, `qr-pod${entrance.number}.zip`)
+    } catch (e: any) {
+      setError(e?.message ?? 'Ошибка генерации ZIP')
+    } finally {
+      setZipBusy(false)
+    }
+  }
+
+  const handleDownloadBuildingZip = async () => {
+    if (!building) return
+    setBuildingZipBusy(true)
+    setError('')
+    try {
+      const blob = await qrApi.generateBuildingZip(building.id)
+      triggerDownload(blob, `qr-dom-${building.number}.zip`)
+    } catch (e: any) {
+      setError(e?.message ?? 'Ошибка генерации ZIP по дому')
+    } finally {
+      setBuildingZipBusy(false)
     }
   }
 
@@ -451,7 +489,8 @@ export default observer(function ManagerQr() {
           )}
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Preview */}
             <Button
               kind="secondary"
               size="lg"
@@ -460,23 +499,61 @@ export default observer(function ManagerQr() {
             >
               {previewBusy ? <Spinner size={16} color={T.text} /> : 'Превью QR'}
             </Button>
-            <Button
-              size="lg"
-              onClick={handleDownload}
-              disabled={!entrance || orderedFloors.length === 0 || downloadBusy}
-              leading={Icons.download}
-            >
-              {downloadBusy ? <Spinner size={16} color="#373C46" /> : `Скачать PDF (${orderedFloors.length} эт.)`}
-            </Button>
-            <Button
-              kind="secondary"
-              size="lg"
-              onClick={handleDownloadBuilding}
-              disabled={!building || buildingDownloadBusy}
-              leading={Icons.download}
-            >
-              {buildingDownloadBusy ? <Spinner size={16} color={T.text} /> : 'PDF весь дом'}
-            </Button>
+
+            {/* PDF row */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                size="lg"
+                onClick={handleDownload}
+                disabled={!entrance || orderedFloors.length === 0 || downloadBusy}
+                leading={Icons.download}
+                style={{ flex: 1 }}
+              >
+                {downloadBusy
+                  ? <Spinner size={16} color="#373C46" />
+                  : `PDF · ${orderedFloors.length > 0 ? `${orderedFloors.length} эт.` : 'выберите этажи'}`}
+              </Button>
+              <Button
+                kind="secondary"
+                size="lg"
+                onClick={handleDownloadBuilding}
+                disabled={!building || buildingDownloadBusy}
+                leading={Icons.download}
+                style={{ flex: 1 }}
+              >
+                {buildingDownloadBusy ? <Spinner size={16} color={T.text} /> : 'PDF весь дом'}
+              </Button>
+            </div>
+
+            {/* ZIP row */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                kind="ghost"
+                size="lg"
+                onClick={handleDownloadZip}
+                disabled={!entrance || orderedFloors.length === 0 || zipBusy}
+                leading={zipIcon}
+                style={{ flex: 1, border: `1px dashed ${T.border2}` }}
+              >
+                {zipBusy
+                  ? <Spinner size={16} color={T.text} />
+                  : `ZIP PNG · ${orderedFloors.length > 0 ? `${orderedFloors.length} эт.` : 'выберите этажи'}`}
+              </Button>
+              <Button
+                kind="ghost"
+                size="lg"
+                onClick={handleDownloadBuildingZip}
+                disabled={!building || buildingZipBusy}
+                leading={zipIcon}
+                style={{ flex: 1, border: `1px dashed ${T.border2}` }}
+              >
+                {buildingZipBusy ? <Spinner size={16} color={T.text} /> : 'ZIP PNG весь дом'}
+              </Button>
+            </div>
+
+            <div style={{ fontSize: 11.5, color: T.textDim, fontFamily: FONT, lineHeight: 1.4 }}>
+              ZIP — квадратные PNG 800×800 px без подписей, для дизайнера или вёрстки
+            </div>
           </div>
         </div>
 
